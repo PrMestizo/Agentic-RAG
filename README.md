@@ -1,104 +1,108 @@
-# 🤖 Agentic RAG con LangGraph
+# 🤖 Agentic RAG con LangGraph y Sincronización Asíncrona (Celery + Watchdog)
 
-Una implementación modular de **RAG Agéntico Auto-Correctivo (Corrective RAG - CRAG)** utilizando **LangGraph**, **LangChain** y **OpenAI**. El sistema evalúa de forma autónoma la relevancia de la información recuperada y decide si debe responder de inmediato, reescribir la pregunta original para mejorar la búsqueda, o solicitar más contexto a través de herramientas de recuperación.
+Una implementación de producción de **RAG Agéntico Auto-Correctivo (Corrective RAG - CRAG)** utilizando **LangGraph**, **LangChain** y **OpenAI**, optimizada para el procesamiento masivo de documentos en tiempo real. 
+
+El sistema utiliza **Watchdog** para monitorizar directorios en tiempo real, **Celery** y **Redis** para encolar de forma asíncrona la extracción y vectorización de documentos (soportando **MinerU**), y persiste los embeddings en una base de datos local **Chroma**.
 
 ---
 
 ## 📐 Arquitectura del Sistema
 
-El flujo del agente sigue el siguiente diagrama de estados, en el cual las decisiones de enrutamiento y evaluación se ejecutan automáticamente en base al contexto obtenido:
-
 ```mermaid
 graph TD
-    START --> generate_query_or_respond[1. Generar Consulta o Responder]
-    generate_query_or_respond -->|¿Requiere herramienta?| retrieve[2. Recuperar Documentos]
-    generate_query_or_respond -->|¿Fin del flujo?| END
+    user[Usuario/OS] -->|Modifica Carpeta| watched_dir[./watched_documents]
+    watcher_py[watcher.py] -->|Eventos de Watchdog| watched_dir
+    watcher_py -->|Encola tareas async| redis[(Redis Broker)]
     
-    retrieve --> grade_documents{3. Grader de Documentos}
-    grade_documents -->|Relevante| generate_answer[4. Generar Respuesta]
-    grade_documents -->|No Relevante| rewrite_question[5. Reescribir Pregunta]
+    celery_app[celery_app.py - Workers] -->|Consume tareas| redis
+    celery_app -->|index/delete| database_py[database.py]
     
-    generate_answer --> END
-    rewrite_question --> generate_query_or_respond
+    database_py -->|MinerU / Fallback| extraction[Pipeline de Extracción]
+    database_py -->|Guarda vectores| chroma[(Chroma DB - ./chroma_db)]
     
-    style START fill:#f9f,stroke:#333,stroke-width:2px
-    style END fill:#f9f,stroke:#333,stroke-width:2px
-    style grade_documents fill:#ff9,stroke:#333,stroke-width:2px
+    main_py[main.py] -->|Usa retriever| chroma
 ```
 
 ---
 
 ## 🗂️ Estructura del Proyecto
 
-El proyecto está diseñado bajo una arquitectura modular que separa la configuración, la ingesta de datos, el flujo de estados de LangGraph y los prompts:
+El proyecto está diseñado bajo una arquitectura modular desacoplada:
 
-*   **`config.py`**: Carga las variables de entorno e inicializa los clientes de los LLMs (`gpt-4o-mini`) y modelos de embeddings.
-*   **`database.py`**: Descarga dinámicamente artículos de referencia, realiza el procesamiento/segmentación del texto (`RecursiveCharacterTextSplitter`) e inicializa la base de datos vectorial en memoria.
-*   **`tools.py`**: Define la herramienta (`retrieve_blog_posts`) que permite al agente realizar búsquedas semánticas.
-*   **`nodes.py`**: Agrupa la lógica individual de cada estado (generación de respuestas, reescritura de preguntas y evaluación de relevancia).
-*   **`graph.py`**: Define la topología del flujo, las transiciones condicionales y compila la máquina de estados.
-*   **`main.py`**: Punto de entrada ejecutable desde consola que maneja la entrada de usuario y muestra el flujo de razonamiento del agente paso a paso.
+*   **`config.py`**: Configuración general, variables de entorno (API keys, URLs de Redis) e inicialización de modelos.
+*   **`database.py`**: Pipeline de ingesta. Soporta extracción de PDF de alta calidad con **MinerU** (`magic-pdf`) con fallback automático a cargadores estándar. Administra e indexa los vectores de forma persistente en **Chroma**.
+*   **`tools.py`**: Herramienta de búsqueda semántica (`retrieve_blog_posts`) expuesta al agente.
+*   **`nodes.py`**: Lógica de los estados del agente (enrutamiento de consultas, grading de relevancia, reescritura de preguntas y generación).
+*   **`graph.py`**: Estructura de LangGraph y compilación de la máquina de estados.
+*   **`celery_app.py`**: Aplicación de Celery que define las tareas en segundo plano para procesar e indexar documentos.
+*   **`watcher.py`**: Demonio que vigila cambios en el directorio local y los envía a la cola.
+*   **`main.py`**: Entrada ejecutable por consola para realizar consultas al agente.
 
 ---
 
 ## 🚀 Instalación y Configuración
 
-El proyecto utiliza **Poetry** para la gestión de dependencias y entornos virtuales.
+El proyecto gestiona sus dependencias utilizando **Poetry**.
 
-### Prerrequisitos
+### 1. Prerrequisitos
 
-*   Python `>= 3.14` (o la versión activa en tu entorno)
-*   Una clave de API de OpenAI
+*   Python `>= 3.14` (o versión activa en tu entorno)
+*   **Redis** (Ej. corriendo en Docker)
+*   Clave de API de OpenAI
 
-### Pasos de Configuración
+### 2. Configuración inicial
 
-1.  **Instalar Dependencias**:
-    Asegúrate de estar en el directorio raíz del proyecto y ejecuta:
+1.  **Instalar dependencias**:
     ```bash
     poetry install
     ```
 
-2.  **Configurar Variables de Entorno**:
+2.  **Configurar variables de entorno**:
     Copia el archivo de ejemplo para crear tu `.env`:
     ```bash
     cp .env.example .env
     ```
-    Abre el archivo `.env` recién creado y añade tu OpenAI API key:
+    Edita `.env` e introduce tus credenciales:
     ```env
     OPENAI_API_KEY=tu-openai-api-key-aquí
+    REDIS_URL=redis://localhost:6379/0
     ```
 
 ---
 
-## 💻 Ejecución
+## 💻 Ejecución del Entorno Completo
 
-Puedes ejecutar el agente utilizando el comando nativo de Poetry.
+Para ejecutar la sincronización y el RAG en tiempo real, necesitarás abrir 3 terminales:
 
-### Consulta por defecto
-
-Ejecuta el script con la consulta del tutorial por defecto (relacionada con *Reward Hacking* en los blogs de Lilian Weng):
+### Terminal 1: Broker de Redis
+Levanta un contenedor de Redis si no tienes uno activo:
 ```bash
-poetry run python main.py
+docker run -d --name redis-broker -p 6379:6379 redis
 ```
 
-### Consulta personalizada
-
-Puedes pasarle cualquier pregunta al agente directamente a través de argumentos de línea de comando:
+### Terminal 2: Worker de Celery
+Ejecuta el worker que procesará los documentos en segundo plano. En Windows es necesario especificar el pool `solo`:
 ```bash
-poetry run python main.py "¿Qué opina Lilian Weng sobre la alucinación en LLMs?"
+poetry run celery -A celery_app worker --loglevel=info --pool=solo
 ```
+
+### Terminal 3: Guardián de Directorio (Watcher)
+Inicia la monitorización en tiempo real de tu carpeta local:
+```bash
+poetry run python watcher.py
+```
+
+*(Por defecto vigilará la carpeta recién creada `./watched_documents`)*.
 
 ---
 
-## 🛠️ Cómo Extender el Sistema
+## 🔍 Prueba de Sincronización en Tiempo Real
 
-La modularidad del diseño facilita realizar adaptaciones rápidas:
-
-*   **Conectar una Base de Datos Vectorial Persistente**:
-    Edita la función `_build_retriever()` en `database.py` para reemplazar `InMemoryVectorStore` por clientes de bases de datos como **ChromaDB**, **Pinecone** o **Qdrant**.
-*   **Añadir Nuevas Fuentes de Información**:
-    Modifica la lista de `urls` en `database.py` para apuntar a otros artículos o integra cargadores de PDFs / archivos locales utilizando `langchain_community.document_loaders`.
-*   **Agregar Herramientas**:
-    Define nuevos métodos con el decorador `@tool` en `tools.py` y agrégalos a la lista de herramientas en `nodes.py` vinculadas a tu LLM.
-*   **Ajustar Criterios de Evaluación**:
-    Modifica el prompt `GRADE_PROMPT` en `nodes.py` para endurecer o flexibilizar las reglas con las cuales el agente califica si un documento es relevante.
+1.  **Indexación**: Copia cualquier documento (PDF, TXT, MD, HTML) dentro de la carpeta `watched_documents/`.
+    *   Verás al instante en la consola del *Watcher* la detección del archivo.
+    *   El *Worker* de Celery recibirá la tarea, extraerá el texto (usando **MinerU** si el comando `magic-pdf` está disponible, o un lector básico de PDF en su defecto), generará embeddings y guardará los vectores en `./chroma_db`.
+2.  **Consulta**: Ejecuta el RAG preguntando sobre el documento que acabas de subir:
+    ```bash
+    poetry run python main.py "Pregunta específica sobre tu documento..."
+    ```
+3.  **Eliminación**: Borra el documento de `watched_documents/`. El sistema eliminará automáticamente de forma asíncrona todos sus vectores en Chroma, garantizando que el agente no use información desactualizada.
