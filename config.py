@@ -1,16 +1,15 @@
 import os
 from dotenv import load_dotenv
-from langchain.chat_models import init_chat_model
-from langchain_openai import OpenAIEmbeddings
+from langchain_openai import ChatOpenAI, OpenAIEmbeddings
 
 # Load environment variables from .env file
 load_dotenv()
 
-# Verify that OPENAI_API_KEY is present
-if not os.environ.get("OPENAI_API_KEY"):
+# Verify that OPENROUTER_API_KEY is present
+if not os.environ.get("OPENROUTER_API_KEY"):
     raise ValueError(
-        "ERROR: OPENAI_API_KEY is not set. Please copy .env.example to .env, "
-        "add your OpenAI API key to .env, and try again."
+        "ERROR: OPENROUTER_API_KEY is not set. Please copy .env.example to .env, "
+        "add your OpenRouter API key to .env, and try again."
     )
 
 # Redis configuration for Celery
@@ -22,10 +21,33 @@ WATCHED_DIR = os.environ.get("WATCHED_DIR", "./watched_documents")
 # Local directory where Chroma DB vectors will be saved
 CHROMA_DB_DIR = os.environ.get("CHROMA_DB_DIR", "./chroma_db")
 
-def get_llm(model_name: str = "gpt-4o-mini", temperature: float = 0.0):
-    """Initialize and return a chat model using init_chat_model."""
-    return init_chat_model(model_name, temperature=temperature)
+# Default Models from OpenRouter (Llama-3-8b-instruct free version)
+DEFAULT_LLM_MODEL = os.environ.get("OPENROUTER_MODEL", "meta-llama/llama-3-8b-instruct:free")
+DEFAULT_EMBEDDING_MODEL = os.environ.get("OPENROUTER_EMBEDDING_MODEL", "openai/text-embedding-3-small")
 
-def get_embeddings():
-    """Initialize and return OpenAIEmbeddings."""
-    return OpenAIEmbeddings()
+def get_llm(model_name: str | None = None, temperature: float = 0.0):
+    """Initialize and return a chat model pointing to OpenRouter."""
+    # Safety adapter: redirect standard OpenAI model names to the free model
+    if model_name is None or model_name.startswith("gpt-"):
+        model_name = DEFAULT_LLM_MODEL
+        
+    print(f"[Config] Initializing Chat Model: {model_name} (via OpenRouter)")
+    return ChatOpenAI(
+        model=model_name,
+        temperature=temperature,
+        openai_api_key=os.environ.get("OPENROUTER_API_KEY"),
+        openai_api_base="https://openrouter.ai/api/v1",
+    )
+
+def get_embeddings(model_name: str | None = None):
+    """Initialize and return an embedding model pointing to OpenRouter."""
+    # Safety adapter: redirect standard embedding names to the configured model
+    if model_name is None or "text-embedding" in model_name:
+        model_name = DEFAULT_EMBEDDING_MODEL
+        
+    print(f"[Config] Initializing Embeddings: {model_name} (via OpenRouter)")
+    return OpenAIEmbeddings(
+        model=model_name,
+        openai_api_key=os.environ.get("OPENROUTER_API_KEY"),
+        openai_api_base="https://openrouter.ai/api/v1",
+    )
