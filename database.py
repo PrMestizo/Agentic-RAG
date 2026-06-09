@@ -58,8 +58,10 @@ def extract_text_from_file(file_path: str) -> list[Document]:
             return loader.load()
         except ImportError:
             print("WARNING: 'pypdf' is not installed. PDF fallback loader skipped. Run `poetry add pypdf` to parse PDFs without MinerU.")
+            return []
         except Exception as e:
             print(f"PDF fallback loader error: {e}")
+            return []
 
     # 2. Text or Markdown files
     if ext in [".txt", ".md", ".markdown"]:
@@ -119,21 +121,8 @@ def _build_default_database():
     print(f"Indexed default Lilian Weng blog posts. Split into {len(doc_splits)} chunks.")
 
 def get_retriever():
-    """Exposes the retriever. Performs default indexing if Chroma is empty."""
+    """Exposes the retriever."""
     vectorstore = get_vectorstore()
-    db_empty = True
-    try:
-        # Query database to see if we have any entries
-        results = vectorstore.similarity_search("hacking", k=1)
-        if results:
-            db_empty = False
-    except Exception:
-        pass
-
-    if db_empty:
-        print("Chroma DB is empty. Performing initial indexing of Lilian Weng blog posts for demonstration...")
-        _build_default_database()
-
     return vectorstore.as_retriever()
 
 def index_document(file_path: str):
@@ -158,7 +147,10 @@ def index_document(file_path: str):
     
     # Store
     vectorstore = get_vectorstore()
-    vectorstore.add_documents(doc_splits)
+    batch_size = 5000
+    for i in range(0, len(doc_splits), batch_size):
+        batch = doc_splits[i:i+batch_size]
+        vectorstore.add_documents(batch)
     print(f"Successfully indexed {abs_path}. Split into {len(doc_splits)} chunks.")
 
 def delete_document(file_path: str):

@@ -159,3 +159,7 @@ $RECYCLE.BIN/
 *.njsproj
 *.sln
 *.sw?
+
+# Database and Scripts
+chroma_db/
+ingest_all.py
