@@ -35,8 +35,8 @@ def get_llm(model_name: str | None = None, temperature: float = 0.0):
     return ChatOpenAI(
         model=model_name,
         temperature=temperature,
-        openai_api_key=os.environ.get("OPENROUTER_API_KEY"),
-        openai_api_base="https://openrouter.ai/api/v1",
+        api_key=os.environ.get("OPENROUTER_API_KEY"),
+        base_url="https://openrouter.ai/api/v1",
     )
 
 def get_embeddings(model_name: str | None = None):
@@ -48,6 +48,6 @@ def get_embeddings(model_name: str | None = None):
     print(f"[Config] Initializing Embeddings: {model_name} (via OpenRouter)")
     return OpenAIEmbeddings(
         model=model_name,
-        openai_api_key=os.environ.get("OPENROUTER_API_KEY"),
-        openai_api_base="https://openrouter.ai/api/v1",
+        api_key=os.environ.get("OPENROUTER_API_KEY"),
+        base_url="https://openrouter.ai/api/v1",
     )

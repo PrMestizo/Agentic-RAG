@@ -6,6 +6,7 @@ import tempfile
 import pathlib
 from langchain_core.documents import Document
 from langchain_text_splitters import RecursiveCharacterTextSplitter
+from langchain_experimental.text_splitter import SemanticChunker
 from langchain_chroma import Chroma
 from config import get_embeddings, CHROMA_DB_DIR
 
@@ -140,10 +141,39 @@ def index_document(file_path: str):
         return
         
     # Split
-    text_splitter = RecursiveCharacterTextSplitter.from_tiktoken_encoder(
-        chunk_size=100, chunk_overlap=50
-    )
+    print("Applying Semantic Chunking...")
+    text_splitter = SemanticChunker(get_embeddings(), breakpoint_threshold_type="percentile")
     doc_splits = text_splitter.split_documents(docs)
+    
+    # Contextual Retrieval Injection
+    print("Applying Contextual Retrieval (Chunk-level metadata injection)...")
+    try:
+        from config import get_llm
+        llm = get_llm()
+        
+        # Step 1: Global Context
+        first_page_content = docs[0].page_content[:2000] if docs else ""
+        global_prompt = f"Extract the Title, Author/Company, and Main Topic of this document. Keep it extremely brief (max 2 sentences).\nDocument start: {first_page_content}"
+        global_context = llm.invoke(global_prompt).content
+        print(f"Global Context extracted: {global_context}")
+        
+        # Step 2: Chunk-level Context
+        for i, chunk in enumerate(doc_splits):
+            if i % 10 == 0:
+                print(f"Injecting context into chunk {i+1}/{len(doc_splits)}...")
+                
+            chunk_prompt = (
+                f"Document context: {global_context}\n"
+                f"Chunk text: {chunk.page_content}\n"
+                "Given the document context, write a single concise sentence summarizing the specific topic, entities, or metrics discussed in this chunk. "
+                "Reply ONLY with that single sentence."
+            )
+            chunk_summary = llm.invoke(chunk_prompt).content
+            
+            # Prepend context to the text so the embedding model sees it
+            chunk.page_content = f"Context: {global_context} - {chunk_summary}\n\nOriginal Text: {chunk.page_content}"
+    except Exception as e:
+        print(f"Failed during Contextual Retrieval injection: {e}")
     
     # Store
     vectorstore = get_vectorstore()

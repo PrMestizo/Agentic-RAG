@@ -2347,6 +2347,22 @@ typing-extensions = ">=4.7.0,<5.0.0"
 uuid-utils = ">=0.12.0,<1.0"
 
 [[package]]
+name = "langchain-experimental"
+version = "0.4.2"
+description = "Building applications with LLMs through composability"
+optional = false
+python-versions = "<4.0,>=3.10"
+groups = ["main"]
+files = [
+    {file = "langchain_experimental-0.4.2-py3-none-any.whl", hash = "sha256:fd98b9948cb6f991e0f632ea3d5fb839bcfe21e6d5a190a51126a76270a66d40"},
+    {file = "langchain_experimental-0.4.2.tar.gz", hash = "sha256:1130fa7ecad5959e687295b2f7850ae3e5d8eeee6796bf9e99910806475d8acc"},
+]
+
+[package.dependencies]
+langchain-community = ">=0.4.2,<1.0.0"
+langchain-core = ">=1.4.0,<2.0.0"
+
+[[package]]
 name = "langchain-openai"
 version = "1.2.2"
 description = "An integration package connecting OpenAI and LangChain"
@@ -6769,4 +6785,4 @@ cffi = ["cffi (>=1.17,<2.0) ; platform_python_implementation != \"PyPy\" and pyt
 [metadata]
 lock-version = "2.1"
 python-versions = ">=3.12,<3.14"
-content-hash = "3b3cf58baf526ef585e5caf59fb53e6baecc1908ab7130f172186ca63dd4ecf6"
+content-hash = "a46ac3807ad70982e7993ef0d7d1c8a13e9d1ede6223d7cb94c8f8f9cb7ce736"
