@@ -144,7 +144,7 @@ def _build_default_database():
 def get_retriever():
     """Exposes the retriever."""
     vectorstore = get_vectorstore()
-    return vectorstore.as_retriever()
+    return vectorstore.as_retriever(search_kwargs={"k": 8})
 
 def index_document(file_path: str):
     """Indexes a local file into Chroma DB."""
@@ -167,33 +167,43 @@ def index_document(file_path: str):
     
     # Contextual Retrieval Injection
     print("Applying Contextual Retrieval (Chunk-level metadata injection)...")
+    from config import get_llm
+    llm = get_llm()
+    
+    # Step 1: Global Context
+    global_context = "Unknown document context"
     try:
-        from config import get_llm
-        llm = get_llm()
-        
-        # Step 1: Global Context
         first_page_content = docs[0].page_content[:2000] if docs else ""
         global_prompt = f"Extract the Title, Author/Company, and Main Topic of this document. Keep it extremely brief (max 2 sentences).\nDocument start: {first_page_content}"
         global_context = llm.invoke(global_prompt).content
         print(f"Global Context extracted: {global_context}")
+    except Exception as e:
+        print(f"Failed to extract Global Context: {e}")
         
-        # Step 2: Chunk-level Context
-        for i, chunk in enumerate(doc_splits):
-            if i % 10 == 0:
-                print(f"Injecting context into chunk {i+1}/{len(doc_splits)}...")
-                
+    # Step 2: Chunk-level Context
+    for i, chunk in enumerate(doc_splits):
+        if i % 10 == 0:
+            print(f"Injecting context into chunk {i+1}/{len(doc_splits)}...")
+            
+        chunk_summary = ""
+        try:
+            # Truncate chunk text to ~8000 characters to prevent LM Studio context overflow
+            truncated_text = chunk.page_content[:8000]
             chunk_prompt = (
                 f"Document context: {global_context}\n"
-                f"Chunk text: {chunk.page_content}\n"
+                f"Chunk text: {truncated_text}\n"
                 "Given the document context, write a single concise sentence summarizing the specific topic, entities, or metrics discussed in this chunk. "
                 "Reply ONLY with that single sentence."
             )
             chunk_summary = llm.invoke(chunk_prompt).content
-            
-            # Prepend context to the text so the embedding model sees it
+        except Exception as e:
+            print(f"Failed to summarize chunk {i+1}, using only global context. Error: {e}")
+        
+        # Prepend context to the text so the embedding model sees it
+        if chunk_summary:
             chunk.page_content = f"Context: {global_context} - {chunk_summary}\n\nOriginal Text: {chunk.page_content}"
-    except Exception as e:
-        print(f"Failed during Contextual Retrieval injection: {e}")
+        else:
+            chunk.page_content = f"Context: {global_context}\n\nOriginal Text: {chunk.page_content}"
     
     # Store
     vectorstore = get_vectorstore()
