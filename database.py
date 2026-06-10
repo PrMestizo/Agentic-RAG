@@ -21,25 +21,45 @@ def load_web_page(url: str, bs_kwargs: dict | None = None) -> list[Document]:
     return [Document(page_content=soup.get_text(), metadata={"source": url})]
 
 def extract_pdf_with_mineru(file_path: str) -> list[Document]:
-    """Tries to extract PDF text using MinerU's CLI (magic-pdf)."""
+    """Tries to extract PDF text using MinerU's CLI via Docker."""
     try:
-        # Check if magic-pdf command exists in PATH
-        subprocess.run(["magic-pdf", "--version"], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, check=True)
+        # Create a persistent directory for MinerU output
+        out_dir = os.path.abspath("mineru_extractions")
+        os.makedirs(out_dir, exist_ok=True)
         
-        with tempfile.TemporaryDirectory() as temp_dir:
-            print(f"Running MinerU (magic-pdf) on {file_path}...")
-            cmd = ["magic-pdf", "-p", file_path, "-o", temp_dir]
-            subprocess.run(cmd, check=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-            
-            temp_path = pathlib.Path(temp_dir)
-            md_files = list(temp_path.glob("**/*.md"))
-            if md_files:
-                md_file = md_files[0]
-                with open(md_file, "r", encoding="utf-8") as f:
-                    content = f.read()
-                return [Document(page_content=content, metadata={"source": file_path})]
+        abs_file_path = os.path.abspath(file_path)
+        file_dir = os.path.dirname(abs_file_path)
+        file_name = os.path.basename(abs_file_path)
+        
+        print(f"Running MinerU (Docker) on {file_path}...")
+        
+        # We mount the directory containing the PDF and the output directory into the container
+        cmd = [
+            "docker", "run", "--rm",
+            "-v", f"{file_dir}:/input",
+            "-v", f"{out_dir}:/output",
+            "mineru:latest",
+            "mineru", "-b", "pipeline", "-p", f"/input/{file_name}", "-o", "/output"
+        ]
+        
+        subprocess.run(cmd, check=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+        
+        base_name = os.path.splitext(file_name)[0]
+        pdf_out_dir = pathlib.Path(out_dir) / base_name
+        
+        if pdf_out_dir.exists():
+            md_files = list(pdf_out_dir.glob("**/*.md"))
+        else:
+            md_files = list(pathlib.Path(out_dir).glob("**/*.md"))
+
+        if md_files:
+            # Use the most recently modified markdown file to ensure we get the latest extraction
+            md_file = max(md_files, key=os.path.getmtime)
+            with open(md_file, "r", encoding="utf-8") as f:
+                content = f.read()
+            return [Document(page_content=content, metadata={"source": file_path})]
     except Exception as e:
-        print(f"MinerU extraction failed or not installed (magic-pdf). Error: {e}")
+        print(f"MinerU Docker extraction failed. Error: {e}")
     return []
 
 def extract_text_from_file(file_path: str) -> list[Document]:

@@ -163,3 +163,5 @@ $RECYCLE.BIN/
 # Database and Scripts
 chroma_db/
 ingest_all.py
+
+mineru_extractions/

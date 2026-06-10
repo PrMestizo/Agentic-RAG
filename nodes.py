@@ -39,7 +39,7 @@ class GradeDocuments(BaseModel):
 
 def grade_documents(
     state: MessagesState,
-) -> Literal["generate_answer", "rewrite_question"]:
+) -> Literal["generate_answer", "rewrite_question", "max_retries"]:
     """Determine whether the retrieved documents are relevant to the question."""
     print("--- GRADING RETRIEVED DOCUMENTS ---")
     question = state["messages"][0].content
@@ -58,15 +58,22 @@ def grade_documents(
     if score == "yes":
         return "generate_answer"
     else:
+        # Count tool messages to prevent infinite loop
+        retries = len([m for m in state["messages"] if m.type == "tool"])
+        if retries >= 3:
+            print("--- MAX RETRIES REACHED ---")
+            return "max_retries"
         return "rewrite_question"
 
 REWRITE_PROMPT = (
     "Look at the input and try to reason about the underlying semantic intent / meaning.\n"
-    "Here is the initial question:"
-    "\n ------- \n"
-    "{question}"
-    "\n ------- \n"
-    "Formulate an improved question:"
+    "Here is the initial question:\n"
+    "-------\n"
+    "{question}\n"
+    "-------\n"
+    "Formulate an improved question in the same language as the original.\n"
+    "CRITICAL: OUTPUT ONLY THE REWRITTEN QUESTION TEXT AND NOTHING ELSE. "
+    "Do not include conversational text, greetings, explanations, or multiple options."
 )
 
 def rewrite_question(state: MessagesState):

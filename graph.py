@@ -40,6 +40,11 @@ workflow.add_conditional_edges(
 workflow.add_conditional_edges(
     "retrieve",
     grade_documents,
+    {
+        "generate_answer": "generate_answer",
+        "rewrite_question": "rewrite_question",
+        "max_retries": "generate_answer",
+    }
 )
 
 # Transitions from final nodes
