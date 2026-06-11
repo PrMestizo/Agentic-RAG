@@ -59,6 +59,26 @@ async def chat_endpoint(request: Request):
                 elif event_type == "on_chain_end" and name in ["generate_query_or_respond", "retrieve", "rewrite_question", "generate_answer"]:
                     yield f"data: {json.dumps({'type': 'status', 'status': 'end', 'node': name})}\n\n"
                     
+                # Parse and yield retrieved document sources
+                elif event_type == "on_tool_end" and name == "retrieve_documents":
+                    output_text = event["data"]["output"]
+                    import re
+                    # Split string by the Document header format to isolate individual documents and their metadata
+                    parts = re.split(r'Document (\d+) \(Source: ([^)]+)\):\r?\n', output_text)
+                    sources = []
+                    for idx in range(1, len(parts), 3):
+                        if idx + 2 < len(parts):
+                            doc_num = parts[idx].strip()
+                            source_file = parts[idx+1].strip()
+                            text_content = parts[idx+2].strip()
+                            sources.append({
+                                "index": doc_num,
+                                "source": source_file,
+                                "content": text_content
+                            })
+                    if sources:
+                        yield f"data: {json.dumps({'type': 'sources', 'sources': sources})}\n\n"
+                    
                 # Yield LLM tokens
                 elif event_type == "on_chat_model_stream":
                     chunk = event["data"]["chunk"]

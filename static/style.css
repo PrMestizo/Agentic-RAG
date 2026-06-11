@@ -855,3 +855,88 @@ body.light-theme .input-wrapper {
         grid-template-columns: 1fr;
     }
 }
+
+/* Citation Badges & Tooltips */
+.citation-badge {
+    position: relative;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    background-color: var(--accent-light);
+    color: var(--accent-color);
+    border-radius: 6px;
+    padding: 1px 5px;
+    font-size: 11px;
+    font-weight: 600;
+    margin: 0 3px;
+    cursor: pointer;
+    vertical-align: super;
+    line-height: 1;
+    user-select: none;
+    transition: background-color var(--transition-speed), color var(--transition-speed);
+}
+
+.citation-badge:hover, .citation-badge.active {
+    background-color: var(--accent-color);
+    color: white;
+}
+
+/* Tooltip container */
+.citation-tooltip {
+    visibility: hidden;
+    position: absolute;
+    bottom: 135%;
+    left: 50%;
+    transform: translateX(-50%) translateY(4px);
+    background-color: var(--bg-secondary);
+    border: 1px solid var(--border-color);
+    color: var(--text-primary);
+    padding: 12px;
+    border-radius: 8px;
+    font-size: 12px;
+    line-height: 1.4;
+    width: 280px;
+    max-height: 150px;
+    overflow-y: auto;
+    box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.4), 0 4px 6px -4px rgba(0, 0, 0, 0.4);
+    z-index: 1000;
+    opacity: 0;
+    transition: opacity 0.2s ease, transform 0.2s ease, visibility 0.2s;
+    pointer-events: auto; /* Allow hovering inside the tooltip for scrolling */
+    cursor: default;
+    font-weight: normal;
+    text-align: left;
+    white-space: normal;
+}
+
+/* Tooltip Title */
+.citation-tooltip strong {
+    color: var(--accent-color);
+    display: block;
+    margin-bottom: 4px;
+    font-size: 12.5px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+/* Show tooltip on hover or active class */
+.citation-badge:hover .citation-tooltip,
+.citation-badge.active .citation-tooltip {
+    visibility: visible;
+    opacity: 1;
+    transform: translateX(-50%) translateY(0);
+}
+
+/* Add a tiny triangle arrow at the bottom of the tooltip */
+.citation-tooltip::after {
+    content: "";
+    position: absolute;
+    top: 100%;
+    left: 50%;
+    transform: translateX(-50%);
+    border-width: 6px;
+    border-style: solid;
+    border-color: var(--border-color) transparent transparent transparent;
+}
+

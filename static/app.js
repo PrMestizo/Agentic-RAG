@@ -119,7 +119,7 @@ function loadSession(id) {
     } else {
         welcomeContainer.style.display = 'none';
         session.messages.forEach(msg => {
-            appendMessage(msg.role, msg.content, false);
+            appendMessage(msg.role, msg.content, false, msg.sources || []);
         });
     }
     
@@ -282,6 +282,8 @@ async function sendMessage() {
     const stepsBlock = createAgentStepsBlock();
     const assistantBubble = appendMessage('assistant', '', true); // starts as empty, placeholder
     
+    let currentSources = [];
+    
     try {
         const response = await fetch('/api/chat', {
             method: 'POST',
@@ -317,13 +319,15 @@ async function sendMessage() {
                         const data = JSON.parse(rawData);
                         if (data.type === 'token') {
                             assistantReply += data.token;
-                            updateMessageText(assistantBubble, assistantReply);
+                            updateMessageText(assistantBubble, assistantReply, currentSources);
+                        } else if (data.type === 'sources') {
+                            currentSources = data.sources;
                         } else if (data.type === 'status') {
                             updateAgentStep(stepsBlock, data.node, data.status);
                         } else if (data.type === 'error') {
                             console.error("Server error:", data.message);
                             assistantReply += `\n\n*Error: ${data.message}*`;
-                            updateMessageText(assistantBubble, assistantReply);
+                            updateMessageText(assistantBubble, assistantReply, currentSources);
                         }
                     } catch (err) {
                         console.error('Failed to parse SSE JSON:', err, line);
@@ -334,7 +338,7 @@ async function sendMessage() {
         
         // Finalize reply in storage
         if (assistantReply.trim()) {
-            session.messages.push({ role: 'assistant', content: assistantReply });
+            session.messages.push({ role: 'assistant', content: assistantReply, sources: currentSources });
             saveSessionsToStorage();
         }
         
@@ -351,7 +355,7 @@ async function sendMessage() {
 }
 
 // UI Helpers
-function appendMessage(role, content, isPlaceholder = false) {
+function appendMessage(role, content, isPlaceholder = false, sources = []) {
     const row = document.createElement('div');
     row.className = `message-row ${role}-msg`;
     
@@ -364,7 +368,7 @@ function appendMessage(role, content, isPlaceholder = false) {
         <div class="message-container">
             ${avatarHtml}
             <div class="message-bubble">
-                ${isPlaceholder ? '<span class="typing-cursor">|</span>' : formatMarkdown(content)}
+                ${isPlaceholder ? '<span class="typing-cursor">|</span>' : formatMarkdown(content, sources)}
             </div>
         </div>
     `;
@@ -381,8 +385,8 @@ function appendMessage(role, content, isPlaceholder = false) {
     return row.querySelector('.message-bubble');
 }
 
-function updateMessageText(bubbleElement, rawContent) {
-    bubbleElement.innerHTML = formatMarkdown(rawContent) + '<span class="typing-cursor">|</span>';
+function updateMessageText(bubbleElement, rawContent, sources = []) {
+    bubbleElement.innerHTML = formatMarkdown(rawContent, sources) + '<span class="typing-cursor">|</span>';
     
     // Trigger highlight.js for any code block inside the update
     bubbleElement.querySelectorAll('pre code').forEach((block) => {
@@ -401,7 +405,7 @@ function updateMessageText(bubbleElement, rawContent) {
     scrollToBottom();
 }
 
-function formatMarkdown(text) {
+function formatMarkdown(text, sources = []) {
     // Basic formatting using Marked.js
     let html = marked.parse(text);
     
@@ -428,6 +432,9 @@ function formatMarkdown(text) {
         wrapper.appendChild(header);
         wrapper.appendChild(pre);
     });
+    
+    // Replace citations in the DOM structure safely
+    replaceCitationsInDOM(tempDiv, sources);
     
     return tempDiv.innerHTML;
 }
@@ -560,3 +567,81 @@ function copyCodeBlock(btn) {
         }, 2000);
     });
 }
+
+// Citation parsing helper to safely replace [1], [2] with hover tooltips
+function replaceCitationsInDOM(node, sources) {
+    if (node.nodeType === Node.TEXT_NODE) {
+        const text = node.nodeValue;
+        const regex = /\[(\d+)\]/g;
+        if (regex.test(text)) {
+            const fragment = document.createDocumentFragment();
+            let lastIndex = 0;
+            regex.lastIndex = 0; // reset
+            let match;
+            while ((match = regex.exec(text)) !== null) {
+                if (match.index > lastIndex) {
+                    fragment.appendChild(document.createTextNode(text.substring(lastIndex, match.index)));
+                }
+                
+                const indexStr = match[1];
+                const src = sources.find(s => s.index === indexStr);
+                
+                if (src) {
+                    const badge = document.createElement('span');
+                    badge.className = 'citation-badge';
+                    badge.textContent = `[${indexStr}]`;
+                    badge.dataset.index = indexStr;
+                    
+                    const tooltip = document.createElement('span');
+                    tooltip.className = 'citation-tooltip';
+                    
+                    const filename = src.source.split(/[/\\]/).pop();
+                    const previewText = src.content.length > 250 
+                        ? src.content.substring(0, 250) + '...' 
+                        : src.content;
+                        
+                    tooltip.innerHTML = `<strong>${filename}</strong><span>${escapeHtml(previewText)}</span>`;
+                    badge.appendChild(tooltip);
+                    
+                    // Mobile tap toggler
+                    badge.addEventListener('click', (e) => {
+                        e.stopPropagation();
+                        const isActive = badge.classList.contains('active');
+                        document.querySelectorAll('.citation-badge').forEach(b => b.classList.remove('active'));
+                        if (!isActive) {
+                            badge.classList.add('active');
+                        }
+                    });
+                    
+                    fragment.appendChild(badge);
+                } else {
+                    fragment.appendChild(document.createTextNode(match[0]));
+                }
+                lastIndex = regex.lastIndex;
+            }
+            if (lastIndex < text.length) {
+                fragment.appendChild(document.createTextNode(text.substring(lastIndex)));
+            }
+            node.parentNode.replaceChild(fragment, node);
+        }
+    } else if (node.nodeType === Node.ELEMENT_NODE && node.nodeName !== 'CODE' && node.nodeName !== 'PRE' && node.nodeName !== 'A') {
+        const children = Array.from(node.childNodes);
+        for (const child of children) {
+            replaceCitationsInDOM(child, sources);
+        }
+    }
+}
+
+function escapeHtml(unsafe) {
+    return unsafe
+        .replace(/&/g, "&amp;")
+        .replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;")
+        .replace(/"/g, "&quot;")
+        .replace(/'/g, "&#039;");
+}
+
+// Dismiss active tooltips when clicking outside
+document.addEventListener('click', () => {
+    document.querySelectorAll('.citation-badge').forEach(b => b.classList.remove('active'));
+});

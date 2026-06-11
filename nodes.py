@@ -134,6 +134,7 @@ GENERATE_PROMPT = (
     "Adapt the length of the response dynamically based on the intent of the question:\n"
     "- If the question is direct or factual (e.g. asking for specific metrics, dates, names, or simple status), keep the response concise, direct, and limited to 2-3 sentences.\n"
     "- If the question asks for a summary, guide, overview, or general explanation (e.g., 'Hazme un resumen...', 'Explica...', '¿Cuáles son las tendencias...?'), provide a detailed, well-structured response using paragraphs, lists, or bullet points to explain the information thoroughly.\n\n"
+    "CRITICAL CITATIONS: You MUST cite the source of every fact, statement, or summary you write. Use the format [1], [2], etc., corresponding to the 'Document X' index in the context (e.g., 'según FTI Consulting [1]...'). Place the citation number immediately after the cited sentence or clause. Do not cite if the facts are not present in the context. Make sure these indices strictly correspond to the document numbers.\n\n"
     "CRITICAL: You MUST answer in Spanish.\n"
     "Question: {question} \n"
     "<context>\n{context}\n</context>"
