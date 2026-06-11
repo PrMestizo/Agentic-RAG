@@ -118,8 +118,8 @@ function loadSession(id) {
         welcomeContainer.style.display = 'flex';
     } else {
         welcomeContainer.style.display = 'none';
-        session.messages.forEach(msg => {
-            appendMessage(msg.role, msg.content, false, msg.sources || []);
+        session.messages.forEach((msg, idx) => {
+            appendMessage(msg.role, msg.content, false, msg.sources || [], msg.timestamp, idx);
         });
     }
     
@@ -271,16 +271,21 @@ async function sendMessage() {
         renderHistory();
     }
     
-    const userMsg = { role: 'user', content: text };
+    const timeNow = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+    const userMsg = { 
+        role: 'user', 
+        content: text,
+        timestamp: timeNow
+    };
     session.messages.push(userMsg);
     saveSessionsToStorage();
     
     // Render user message bubble
-    appendMessage('user', text);
+    appendMessage('user', text, false, [], timeNow, session.messages.length - 1);
     
     // Render empty assistant block and progress steps block
     const stepsBlock = createAgentStepsBlock();
-    const assistantBubble = appendMessage('assistant', '', true); // starts as empty, placeholder
+    const assistantBubble = appendMessage('assistant', '', true, [], null, session.messages.length); // starts as empty, placeholder
     
     let currentSources = [];
     
@@ -338,7 +343,13 @@ async function sendMessage() {
         
         // Finalize reply in storage
         if (assistantReply.trim()) {
-            session.messages.push({ role: 'assistant', content: assistantReply, sources: currentSources });
+            const timeStr = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+            session.messages.push({ 
+                role: 'assistant', 
+                content: assistantReply, 
+                sources: currentSources,
+                timestamp: timeStr
+            });
             saveSessionsToStorage();
         }
         
@@ -355,7 +366,7 @@ async function sendMessage() {
 }
 
 // UI Helpers
-function appendMessage(role, content, isPlaceholder = false, sources = []) {
+function appendMessage(role, content, isPlaceholder = false, sources = [], timestamp = null, msgIndex = null) {
     const row = document.createElement('div');
     row.className = `message-row ${role}-msg`;
     
@@ -364,11 +375,24 @@ function appendMessage(role, content, isPlaceholder = false, sources = []) {
         avatarHtml = `<div class="message-avatar"><i data-lucide="bot"></i></div>`;
     }
     
+    const timeStr = timestamp || new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+    
+    const metaHtml = `
+        <div class="message-meta">
+            <span class="message-time">${timeStr}</span>
+            <button class="msg-meta-btn copy-msg-btn" title="Copiar mensaje"><i data-lucide="copy"></i></button>
+            ${role === 'user' && msgIndex !== null ? `<button class="msg-meta-btn rollback-msg-btn" title="Volver a este mensaje"><i data-lucide="corner-up-left"></i></button>` : ''}
+        </div>
+    `;
+    
     row.innerHTML = `
         <div class="message-container">
             ${avatarHtml}
             <div class="message-bubble">
-                ${isPlaceholder ? '<span class="typing-cursor">|</span>' : formatMarkdown(content, sources)}
+                <div class="message-bubble-content">
+                    ${isPlaceholder ? '<span class="typing-cursor">|</span>' : formatMarkdown(content, sources)}
+                </div>
+                ${metaHtml}
             </div>
         </div>
     `;
@@ -377,19 +401,40 @@ function appendMessage(role, content, isPlaceholder = false, sources = []) {
     scrollToBottom();
     lucide.createIcons();
     
-    // Add copy button listeners
-    row.querySelectorAll('.copy-code-btn').forEach(btn => {
-        btn.addEventListener('click', () => copyCodeBlock(btn));
+    const bubbleContent = row.querySelector('.message-bubble-content');
+    
+    // Copy message click handler
+    row.querySelector('.copy-msg-btn').addEventListener('click', (e) => {
+        e.stopPropagation();
+        const plainText = bubbleContent.innerText.trim();
+        const cleanText = plainText.endsWith('|') ? plainText.slice(0, -1).trim() : plainText;
+        navigator.clipboard.writeText(cleanText).then(() => {
+            const btn = row.querySelector('.copy-msg-btn');
+            btn.innerHTML = `<i data-lucide="check" style="color:var(--status-success)"></i>`;
+            lucide.createIcons();
+            setTimeout(() => {
+                btn.innerHTML = `<i data-lucide="copy"></i>`;
+                lucide.createIcons();
+            }, 1500);
+        });
     });
     
-    return row.querySelector('.message-bubble');
+    // Rollback click handler
+    if (role === 'user' && msgIndex !== null) {
+        row.querySelector('.rollback-msg-btn').addEventListener('click', (e) => {
+            e.stopPropagation();
+            rollbackToMessage(msgIndex);
+        });
+    }
+    
+    return bubbleContent;
 }
 
-function updateMessageText(bubbleElement, rawContent, sources = []) {
-    bubbleElement.innerHTML = formatMarkdown(rawContent, sources) + '<span class="typing-cursor">|</span>';
+function updateMessageText(contentElement, rawContent, sources = []) {
+    contentElement.innerHTML = formatMarkdown(rawContent, sources) + '<span class="typing-cursor">|</span>';
     
     // Trigger highlight.js for any code block inside the update
-    bubbleElement.querySelectorAll('pre code').forEach((block) => {
+    contentElement.querySelectorAll('pre code').forEach((block) => {
         if (!block.dataset.highlighted) {
             hljs.highlightElement(block);
             block.dataset.highlighted = 'true';
@@ -397,7 +442,7 @@ function updateMessageText(bubbleElement, rawContent, sources = []) {
     });
     
     // Add copy button listeners
-    bubbleElement.querySelectorAll('.copy-code-btn').forEach(btn => {
+    contentElement.querySelectorAll('.copy-code-btn').forEach(btn => {
         btn.addEventListener('click', () => copyCodeBlock(btn));
     });
     
@@ -664,3 +709,28 @@ function escapeHtml(unsafe) {
 document.addEventListener('click', () => {
     document.querySelectorAll('.citation-badge').forEach(b => b.classList.remove('active'));
 });
+
+function rollbackToMessage(msgIndex) {
+    const session = sessions.find(s => s.id === activeSessionId);
+    if (!session) return;
+    
+    const text = session.messages[msgIndex].content;
+    
+    if (!confirm(`¿Deseas volver a la pregunta "${text.length > 40 ? text.substring(0, 40) + '...' : text}"? Se borrarán todos los mensajes posteriores.`)) {
+        return;
+    }
+    
+    // Remove all messages starting from msgIndex
+    session.messages.splice(msgIndex);
+    saveSessionsToStorage();
+    
+    // Place this message's text back into the chat input
+    chatInput.value = text;
+    chatInput.dispatchEvent(new Event('input')); // trigger auto-resize
+    
+    // Load session again to refresh the feed
+    loadSession(activeSessionId);
+    
+    // Focus textarea
+    chatInput.focus();
+}

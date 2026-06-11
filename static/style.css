@@ -476,10 +476,16 @@ body.light-theme .suggestion-card:hover {
 
 .message-row.user-msg .message-bubble {
     background-color: var(--bg-message-user);
-    padding: 12px 18px;
+    padding: 10px 16px;
     border-radius: 20px;
     max-width: 85%;
     box-shadow: var(--shadow-md);
+    display: flex;
+    flex-direction: row;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
 }
 
 /* Assistant Message bubble overrides */
@@ -487,6 +493,10 @@ body.light-theme .suggestion-card:hover {
     background-color: var(--bg-message-assistant);
     padding: 4px 0;
     width: 100%;
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 6px;
 }
 
 /* Message Bubble internals */
@@ -495,6 +505,62 @@ body.light-theme .suggestion-card:hover {
     font-size: 15px;
     line-height: 1.6;
     word-break: break-word;
+}
+
+.message-bubble-content {
+    flex: 1 1 auto;
+    min-width: 150px;
+}
+
+.message-meta {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 11px;
+    color: var(--text-secondary);
+    opacity: 0.7;
+    flex-shrink: 0;
+    margin-left: auto;
+    user-select: none;
+}
+
+.message-row.assistant-msg .message-meta {
+    margin-left: 0;
+    margin-top: 4px;
+}
+
+.msg-meta-btn {
+    background: transparent;
+    border: none;
+    color: var(--text-secondary);
+    cursor: pointer;
+    padding: 2px;
+    border-radius: 4px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    opacity: 0.6;
+    transition: color var(--transition-speed), background-color var(--transition-speed), opacity var(--transition-speed);
+}
+
+.msg-meta-btn:hover {
+    color: var(--text-primary);
+    background-color: rgba(255, 255, 255, 0.1);
+    opacity: 1;
+}
+
+body.light-theme .msg-meta-btn:hover {
+    background-color: rgba(0, 0, 0, 0.05);
+}
+
+.msg-meta-btn i {
+    width: 13px;
+    height: 13px;
+}
+
+.message-time {
+    font-size: 11px;
+    margin-right: 2px;
 }
 
 .message-avatar {
