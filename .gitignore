@@ -165,3 +165,4 @@ chroma_db/
 ingest_all.py
 
 mineru_extractions/
+bm25_docs.pkl

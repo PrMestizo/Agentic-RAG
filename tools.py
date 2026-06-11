@@ -18,9 +18,9 @@ def retrieve_documents(query: str) -> str:
         
         chunk_text = f"Document {i+1} (Source: {source}):\n{doc.page_content}"
         
-        # Enforce maximum text context limit to prevent LM Studio / local LLM crash/truncation (12k chars/3k tokens is safe and fast for local GPUs)
-        if total_chars + len(chunk_text) > 12000:
-            print("[Tools] Warning: Context limit reached (12k chars). Truncating further documents.")
+        # Enforce maximum text context limit to prevent LM Studio / local LLM crash/truncation (16k chars/4k tokens is safe and fast for local GPUs)
+        if total_chars + len(chunk_text) > 16000:
+            print("[Tools] Warning: Context limit reached (16k chars). Truncating further documents.")
             break
             
         formatted_docs.append(chunk_text)

@@ -25,15 +25,16 @@ CHROMA_DB_DIR = os.environ.get("CHROMA_DB_DIR", "./chroma_db")
 DEFAULT_LLM_MODEL = os.environ.get("OPENROUTER_MODEL", "meta-llama/llama-3-8b-instruct:free")
 DEFAULT_EMBEDDING_MODEL = os.environ.get("OPENROUTER_EMBEDDING_MODEL", "openai/text-embedding-3-small")
 
-def get_llm(model_name: str | None = None, temperature: float = 0.0):
+def get_llm(model_name: str | None = None, temperature: float = 0.0, streaming: bool = False):
     """Initialize and return a chat model pointing to LM Studio."""
     # We ignore the model_name from OpenRouter and let LM Studio use whatever is loaded
-    print("[Config] Initializing Chat Model (via LM Studio)")
+    print(f"[Config] Initializing Chat Model (via LM Studio, streaming={streaming})")
     return ChatOpenAI(
         model="local-model", # LM studio doesn't care about the name, uses whatever is loaded
         temperature=temperature,
         api_key="lm-studio",
         base_url="http://localhost:1234/v1",
+        streaming=streaming,
     )
 
 def get_embeddings(model_name: str | None = None):

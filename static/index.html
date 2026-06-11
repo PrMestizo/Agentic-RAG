@@ -1,0 +1,121 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Agentic RAG - Chatbot</title>
+    <!-- Google Fonts: Inter -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    
+    <!-- Highlight.js for Code Highlighting (GitHub Dark style) -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/github-dark.min.css">
+    
+    <!-- Custom Style -->
+    <link rel="stylesheet" href="/static/style.css">
+    
+    <!-- Lucide Icons -->
+    <script src="https://unpkg.com/lucide@latest"></script>
+</head>
+<body class="dark-theme">
+    <div class="app-container">
+        <!-- Sidebar Navigation -->
+        <aside class="sidebar" id="sidebar">
+            <div class="sidebar-header">
+                <button class="new-chat-btn" id="new-chat-btn">
+                    <i data-lucide="plus"></i>
+                    <span>Nuevo chat</span>
+                </button>
+            </div>
+            
+            <div class="history-container">
+                <div class="history-label">Conversaciones recientes</div>
+                <div class="history-list" id="history-list">
+                    <!-- History items will be dynamically inserted here -->
+                </div>
+            </div>
+            
+            <div class="sidebar-footer">
+                <button class="theme-toggle-btn" id="theme-toggle-btn">
+                    <i data-lucide="sun" class="sun-icon"></i>
+                    <i data-lucide="moon" class="moon-icon"></i>
+                    <span id="theme-text">Modo Claro</span>
+                </button>
+                <div class="user-profile">
+                    <div class="avatar">AR</div>
+                    <div class="user-info">
+                        <span class="user-name">Agentic RAG</span>
+                        <span class="user-status">Online</span>
+                    </div>
+                </div>
+            </div>
+        </aside>
+
+        <!-- Main Chat Area -->
+        <main class="chat-area">
+            <header class="chat-header">
+                <button class="menu-toggle" id="menu-toggle">
+                    <i data-lucide="menu"></i>
+                </button>
+                <div class="header-title">
+                    <span class="model-badge">Agentic RAG (LangGraph)</span>
+                </div>
+                <button class="clear-current-chat" id="clear-current-chat" title="Limpiar chat actual">
+                    <i data-lucide="trash-2"></i>
+                </button>
+            </header>
+            
+            <!-- Chat Feed -->
+            <div class="chat-feed" id="chat-feed">
+                <!-- Welcome/Empty State -->
+                <div class="welcome-container" id="welcome-container">
+                    <div class="welcome-logo">
+                        <i data-lucide="bot"></i>
+                    </div>
+                    <h1>¿Cómo puedo ayudarte hoy?</h1>
+                    <p class="welcome-subtitle">Pregúntame sobre los documentos, informes y datos indexados en la base de datos.</p>
+                    <div class="suggestions-grid">
+                        <button class="suggestion-card" data-query="¿Qué empresas e informes hay disponibles en la base de datos?">
+                            <span>🔍 Ver documentos indexados</span>
+                            <p>Consulta qué información hay lista para analizar.</p>
+                        </button>
+                        <button class="suggestion-card" data-query="Resume los puntos clave de los informes de consultoría.">
+                            <span>📝 Resumir informes</span>
+                            <p>Obtén un resumen de alto nivel de los informes cargados.</p>
+                        </button>
+                    </div>
+                </div>
+                <!-- Chat messages will be dynamically added here -->
+            </div>
+            
+            <!-- Input Area -->
+            <footer class="chat-input-container">
+                <div class="input-wrapper">
+                    <textarea 
+                        id="chat-input" 
+                        placeholder="Escribe un mensaje..." 
+                        rows="1"
+                        autocomplete="off"
+                    ></textarea>
+                    <button class="send-btn" id="send-btn" disabled>
+                        <i data-lucide="arrow-up"></i>
+                    </button>
+                </div>
+                <div class="input-info">
+                    Agentic RAG puede cometer errores. Considera verificar la información importante.
+                </div>
+            </footer>
+        </main>
+    </div>
+
+    <!-- External libraries -->
+    <!-- Marked.js for Markdown parsing -->
+    <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+    <!-- Highlight.js for code block coloring -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
+    
+    <!-- Application JavaScript -->
+    <script src="/static/app.js"></script>
+</body>
+</html>

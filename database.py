@@ -36,7 +36,7 @@ class CustomEnsembleRetriever(BaseRetriever):
                 rrf_scores[key] += weight * (1 / (rank + c))
                 
         sorted_keys = sorted(rrf_scores.keys(), key=lambda k: rrf_scores[k], reverse=True)
-        return [doc_map[k] for k in sorted_keys][:5]
+        return [doc_map[k] for k in sorted_keys][:10]
 
 BM25_DOCS_PATH = os.path.abspath("bm25_docs.pkl")
 
@@ -172,7 +172,7 @@ def get_retriever():
         return _retriever
 
     vectorstore = get_vectorstore()
-    chroma_retriever = vectorstore.as_retriever(search_kwargs={"k": 5})
+    chroma_retriever = vectorstore.as_retriever(search_kwargs={"k": 10})
     
     bm25_docs = _load_bm25_docs()
     if not bm25_docs:
@@ -181,7 +181,7 @@ def get_retriever():
         return _retriever
         
     bm25_retriever = BM25Retriever.from_documents(bm25_docs)
-    bm25_retriever.k = 5
+    bm25_retriever.k = 10
     
     ensemble_retriever = CustomEnsembleRetriever(
         retrievers=[chroma_retriever, bm25_retriever],
