@@ -22,6 +22,7 @@
     --transition-speed: 0.25s;
     --shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.2), 0 2px 4px -1px rgba(0, 0, 0, 0.1);
     --border-radius: 12px;
+    --bg-history-hover: #262626;
 }
 
 /* Light Theme Variables overriding */
@@ -35,6 +36,7 @@ body.light-theme {
     --text-secondary: #676767;
     --border-color: #e5e5e5;
     --shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.05), 0 2px 4px -1px rgba(0, 0, 0, 0.02);
+    --bg-history-hover: #efefef;
 }
 
 /* Global resets & styles */
@@ -107,7 +109,8 @@ body.light-theme .new-chat-btn:hover {
     background-color: rgba(0, 0, 0, 0.03);
 }
 
-.new-chat-btn i {
+.new-chat-btn i,
+.new-chat-btn svg {
     width: 18px;
     height: 18px;
 }
@@ -151,14 +154,15 @@ body.light-theme .new-chat-btn:hover {
 }
 
 .history-item:hover, .history-item.active {
-    background-color: rgba(255, 255, 255, 0.08);
+    background-color: var(--bg-history-hover);
 }
 
 body.light-theme .history-item:hover, body.light-theme .history-item.active {
-    background-color: rgba(0, 0, 0, 0.04);
+    background-color: var(--bg-history-hover);
 }
 
-.history-item i {
+.history-item i,
+.history-item svg {
     width: 16px;
     height: 16px;
     margin-right: 12px;
@@ -181,8 +185,10 @@ body.light-theme .history-item:hover, body.light-theme .history-item.active {
     display: none;
     align-items: center;
     gap: 4px;
-    background: linear-gradient(90deg, transparent 0%, var(--bg-surface) 30%);
+    background: linear-gradient(90deg, transparent 0%, var(--bg-history-hover) 30%);
     padding-left: 10px;
+    height: 100%;
+    top: 0;
 }
 
 .history-item:hover .history-actions {
@@ -196,12 +202,22 @@ body.light-theme .history-item:hover, body.light-theme .history-item.active {
     color: var(--text-secondary);
     padding: 2px;
     border-radius: 4px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
     transition: color var(--transition-speed), background-color var(--transition-speed);
 }
 
 .history-actions button:hover {
     color: var(--text-primary);
     background-color: rgba(255, 255, 255, 0.1);
+}
+
+.history-actions button i,
+.history-actions button svg {
+    width: 14px;
+    height: 14px;
+    display: block;
 }
 
 /* Sidebar Footer */
@@ -236,7 +252,8 @@ body.light-theme .theme-toggle-btn:hover {
     background-color: rgba(0, 0, 0, 0.03);
 }
 
-.theme-toggle-btn i {
+.theme-toggle-btn i,
+.theme-toggle-btn svg {
     width: 16px;
     height: 16px;
 }
@@ -351,7 +368,8 @@ body.light-theme .clear-current-chat:hover {
     background-color: rgba(0, 0, 0, 0.03);
 }
 
-.clear-current-chat i {
+.clear-current-chat i,
+.clear-current-chat svg {
     width: 20px;
     height: 20px;
 }
@@ -391,7 +409,8 @@ body.light-theme .clear-current-chat:hover {
     margin-bottom: 24px;
 }
 
-.welcome-logo i {
+.welcome-logo i,
+.welcome-logo svg {
     width: 36px;
     height: 36px;
 }
@@ -775,7 +794,8 @@ body.light-theme .agent-steps-header:hover {
     animation: spin 0.8s linear infinite;
 }
 
-.agent-step-item i {
+.agent-step-item i,
+.agent-step-item svg {
     width: 14px;
     height: 14px;
 }
@@ -854,7 +874,8 @@ body.light-theme .input-wrapper {
     opacity: 0.5;
 }
 
-.send-btn i {
+.send-btn i,
+.send-btn svg {
     width: 18px;
     height: 18px;
 }
