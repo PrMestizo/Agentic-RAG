@@ -161,8 +161,8 @@ body.light-theme .history-item:hover, body.light-theme .history-item.active {
     background-color: var(--bg-history-hover);
 }
 
-.history-item i,
-.history-item svg {
+.history-item > i,
+.history-item > svg {
     width: 16px;
     height: 16px;
     margin-right: 12px;
