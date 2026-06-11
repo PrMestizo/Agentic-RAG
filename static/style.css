@@ -476,16 +476,9 @@ body.light-theme .suggestion-card:hover {
 
 .message-row.user-msg .message-bubble {
     background-color: var(--bg-message-user);
-    padding: 10px 16px;
+    padding: 12px 18px;
     border-radius: 20px;
-    max-width: 85%;
     box-shadow: var(--shadow-md);
-    display: flex;
-    flex-direction: row;
-    flex-wrap: wrap;
-    align-items: center;
-    justify-content: space-between;
-    gap: 12px;
 }
 
 /* Assistant Message bubble overrides */
@@ -493,10 +486,6 @@ body.light-theme .suggestion-card:hover {
     background-color: var(--bg-message-assistant);
     padding: 4px 0;
     width: 100%;
-    display: flex;
-    flex-direction: column;
-    align-items: flex-start;
-    gap: 6px;
 }
 
 /* Message Bubble internals */
@@ -507,60 +496,62 @@ body.light-theme .suggestion-card:hover {
     word-break: break-word;
 }
 
-.message-bubble-content {
-    flex: 1 1 auto;
-    min-width: 150px;
+.message-bubble-wrapper {
+    display: flex;
+    flex-direction: column;
+}
+
+.message-row.user-msg .message-bubble-wrapper {
+    align-items: flex-end;
+    max-width: 85%;
+}
+
+.message-row.assistant-msg .message-bubble-wrapper {
+    align-items: flex-start;
+    width: 100%;
 }
 
 .message-meta {
-    display: inline-flex;
+    display: flex;
     align-items: center;
     gap: 6px;
-    font-size: 11px;
-    color: var(--text-secondary);
-    opacity: 0.7;
-    flex-shrink: 0;
-    margin-left: auto;
-    user-select: none;
+    margin-top: 4px;
+    opacity: 0.3;
+    transition: opacity var(--transition-speed);
 }
 
-.message-row.assistant-msg .message-meta {
-    margin-left: 0;
-    margin-top: 4px;
+.message-bubble-wrapper:hover .message-meta {
+    opacity: 1;
 }
 
 .msg-meta-btn {
     background: transparent;
     border: none;
+    padding: 4px;
+    border-radius: 4px;
     color: var(--text-secondary);
     cursor: pointer;
-    padding: 2px;
-    border-radius: 4px;
     display: inline-flex;
     align-items: center;
     justify-content: center;
-    opacity: 0.6;
-    transition: color var(--transition-speed), background-color var(--transition-speed), opacity var(--transition-speed);
+    transition: color var(--transition-speed), background-color var(--transition-speed);
 }
 
 .msg-meta-btn:hover {
     color: var(--text-primary);
-    background-color: rgba(255, 255, 255, 0.1);
-    opacity: 1;
+    background-color: rgba(255, 255, 255, 0.08);
 }
 
 body.light-theme .msg-meta-btn:hover {
     background-color: rgba(0, 0, 0, 0.05);
 }
 
-.msg-meta-btn i {
-    width: 13px;
-    height: 13px;
-}
-
-.message-time {
-    font-size: 11px;
-    margin-right: 2px;
+.msg-meta-btn i,
+.msg-meta-btn svg {
+    width: 14px;
+    height: 14px;
+    stroke-width: 2px;
+    display: block;
 }
 
 .message-avatar {

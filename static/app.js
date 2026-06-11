@@ -375,22 +375,30 @@ function appendMessage(role, content, isPlaceholder = false, sources = [], times
         avatarHtml = `<div class="message-avatar"><i data-lucide="bot"></i></div>`;
     }
     
-    const timeStr = timestamp || new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-    
     const metaHtml = `
-        <div class="message-meta">
-            <span class="message-time">${timeStr}</span>
-            <button class="msg-meta-btn copy-msg-btn" title="Copiar mensaje"><i data-lucide="copy"></i></button>
-            ${role === 'user' && msgIndex !== null ? `<button class="msg-meta-btn rollback-msg-btn" title="Volver a este mensaje"><i data-lucide="corner-up-left"></i></button>` : ''}
+        <div class="message-meta" style="display: flex; align-items: center; gap: 6px; margin-top: 4px;">
+            <button class="msg-meta-btn copy-msg-btn" 
+                    style="background: transparent !important; border: none !important; padding: 4px !important; margin: 0; outline: none !important; box-shadow: none !important; cursor: pointer; color: var(--text-secondary); display: inline-flex; align-items: center; justify-content: center; border-radius: 4px;" 
+                    title="Copiar mensaje">
+                <i data-lucide="copy" style="width: 14px; height: 14px; display: block; stroke-width: 2px;"></i>
+            </button>
+            ${role === 'user' && msgIndex !== null ? `
+            <button class="msg-meta-btn rollback-msg-btn" 
+                    style="background: transparent !important; border: none !important; padding: 4px !important; margin: 0; outline: none !important; box-shadow: none !important; cursor: pointer; color: var(--text-secondary); display: inline-flex; align-items: center; justify-content: center; border-radius: 4px;" 
+                    title="Volver a este mensaje">
+                <i data-lucide="corner-up-left" style="width: 14px; height: 14px; display: block; stroke-width: 2px;"></i>
+            </button>` : ''}
         </div>
     `;
     
     row.innerHTML = `
         <div class="message-container">
             ${avatarHtml}
-            <div class="message-bubble">
-                <div class="message-bubble-content">
-                    ${isPlaceholder ? '<span class="typing-cursor">|</span>' : formatMarkdown(content, sources)}
+            <div class="message-bubble-wrapper">
+                <div class="message-bubble">
+                    <div class="message-bubble-content">
+                        ${isPlaceholder ? '<span class="typing-cursor">|</span>' : formatMarkdown(content, sources)}
+                    </div>
                 </div>
                 ${metaHtml}
             </div>
@@ -410,10 +418,10 @@ function appendMessage(role, content, isPlaceholder = false, sources = [], times
         const cleanText = plainText.endsWith('|') ? plainText.slice(0, -1).trim() : plainText;
         navigator.clipboard.writeText(cleanText).then(() => {
             const btn = row.querySelector('.copy-msg-btn');
-            btn.innerHTML = `<i data-lucide="check" style="color:var(--status-success)"></i>`;
+            btn.innerHTML = `<i data-lucide="check" style="width: 14px; height: 14px; display: block; stroke-width: 2px; color: var(--status-success);"></i>`;
             lucide.createIcons();
             setTimeout(() => {
-                btn.innerHTML = `<i data-lucide="copy"></i>`;
+                btn.innerHTML = `<i data-lucide="copy" style="width: 14px; height: 14px; display: block; stroke-width: 2px;"></i>`;
                 lucide.createIcons();
             }, 1500);
         });
