@@ -596,11 +596,17 @@ function replaceCitationsInDOM(node, sources) {
                     tooltip.className = 'citation-tooltip';
                     
                     const filename = src.source.split(/[/\\]/).pop();
-                    const previewText = src.content.length > 250 
-                        ? src.content.substring(0, 250) + '...' 
-                        : src.content;
+                    
+                    // Clean text (removing HTML tags, tables, images, etc.)
+                    const cleanedSnippet = cleanTooltipText(src.content);
+                    const previewText = cleanedSnippet.length > 250 
+                        ? cleanedSnippet.substring(0, 250) + '...' 
+                        : cleanedSnippet;
+                    
+                    // Render inline markdown elements beautifully (bold, italics, inline code)
+                    const parsedHtml = marked.parseInline(previewText);
                         
-                    tooltip.innerHTML = `<strong>${filename}</strong><span>${escapeHtml(previewText)}</span>`;
+                    tooltip.innerHTML = `<strong>${filename}</strong><span>${parsedHtml}</span>`;
                     badge.appendChild(tooltip);
                     
                     // Mobile tap toggler
@@ -630,6 +636,19 @@ function replaceCitationsInDOM(node, sources) {
             replaceCitationsInDOM(child, sources);
         }
     }
+}
+
+function cleanTooltipText(text) {
+    let clean = text;
+    // 1. Remove markdown images: ![](images/...)
+    clean = clean.replace(/!\[.*?\]\(.*?\)/g, '');
+    // 2. Remove HTML tags like table, tr, td, img
+    clean = clean.replace(/<\/?[a-z][a-z0-9]*\b[^>]*>/gi, ' ');
+    // 3. Remove Markdown header markers (e.g. ###, ##, #)
+    clean = clean.replace(/#+\s+/g, '');
+    // 4. Collapse multiple spaces and newlines
+    clean = clean.replace(/\s+/g, ' ').trim();
+    return clean;
 }
 
 function escapeHtml(unsafe) {

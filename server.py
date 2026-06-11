@@ -61,7 +61,13 @@ async def chat_endpoint(request: Request):
                     
                 # Parse and yield retrieved document sources
                 elif event_type == "on_tool_end" and name == "retrieve_documents":
-                    output_text = event["data"]["output"]
+                    output = event["data"]["output"]
+                    if hasattr(output, "content"):
+                        output_text = output.content
+                    elif isinstance(output, dict) and "content" in output:
+                        output_text = output["content"]
+                    else:
+                        output_text = str(output)
                     import re
                     # Split string by the Document header format to isolate individual documents and their metadata
                     parts = re.split(r'Document (\d+) \(Source: ([^)]+)\):\r?\n', output_text)
@@ -71,6 +77,9 @@ async def chat_endpoint(request: Request):
                             doc_num = parts[idx].strip()
                             source_file = parts[idx+1].strip()
                             text_content = parts[idx+2].strip()
+                            # Strip the prepended RAG metadata context header to get the clean source text snippet
+                            if "Original Text:" in text_content:
+                                text_content = text_content.split("Original Text:", 1)[1].strip()
                             sources.append({
                                 "index": doc_num,
                                 "source": source_file,
