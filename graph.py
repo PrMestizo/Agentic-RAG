@@ -1,6 +1,6 @@
 from langgraph.graph import END, START, StateGraph, MessagesState
 from langgraph.prebuilt import ToolNode
-from tools import retriever_tool
+from tools import retriever_tool, list_ingested_documents
 from nodes import (
     generate_query_or_respond,
     grade_documents,
@@ -12,7 +12,7 @@ workflow = StateGraph(MessagesState)
 
 # Define the nodes we will cycle between
 workflow.add_node(generate_query_or_respond)
-workflow.add_node("retrieve", ToolNode([retriever_tool]))
+workflow.add_node("retrieve", ToolNode([retriever_tool, list_ingested_documents]))
 workflow.add_node(rewrite_question)
 workflow.add_node(generate_answer)
 

@@ -1,5 +1,19 @@
 import os
 import time
+import sys
+
+# Configure standard streams to use UTF-8 encoding to avoid Windows console UnicodeEncodeError
+if sys.stdout.encoding != 'utf-8':
+    try:
+        sys.stdout.reconfigure(encoding='utf-8')
+    except Exception:
+        pass
+if sys.stderr.encoding != 'utf-8':
+    try:
+        sys.stderr.reconfigure(encoding='utf-8')
+    except Exception:
+        pass
+
 from watchdog.observers import Observer
 from watchdog.events import FileSystemEventHandler
 from config import WATCHED_DIR

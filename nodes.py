@@ -3,7 +3,7 @@ from pydantic import BaseModel, Field
 from langchain_core.messages import HumanMessage
 from langgraph.graph import MessagesState
 from config import get_llm
-from tools import retriever_tool
+from tools import retriever_tool, list_ingested_documents
 
 # Initialize models
 response_model = get_llm(model_name="gpt-4o-mini", temperature=0)
@@ -17,12 +17,17 @@ def generate_query_or_respond(state: MessagesState):
     """
     print("--- GENERATING QUERY OR RESPONDING ---")
     system_msg = SystemMessage(
-        content="You are a smart search assistant. If the user asks about authors, companies, or creators of the documents, generate search queries using specific words like 'Author', 'Company', or 'Title' instead of generic terms to improve vector search results."
+        content=(
+            "You are a smart search assistant. Choose the most appropriate tool to answer the user's question:\n"
+            "- Use `list_ingested_documents` ONLY if the user is asking to list all files, reports, or companies available in the database.\n"
+            "- Use `retrieve_documents` to search for specific content, data, metrics, or answers inside the documents (even if they specify a report name like BCG, PwC, or Bain).\n\n"
+            "CRITICAL: The documents in the database are written in English. When calling `retrieve_documents`, you MUST formulate the `query` parameter in English to ensure high BM25 keyword overlap and semantic accuracy. Translate Spanish questions into precise English search terms."
+        )
     )
     messages = [system_msg] + state["messages"]
     response = (
         response_model
-        .bind_tools([retriever_tool]).invoke(messages)
+        .bind_tools([retriever_tool, list_ingested_documents]).invoke(messages)
     )
     return {"messages": [response]}
 
@@ -49,16 +54,42 @@ def grade_documents(
     """Determine whether the retrieved documents are relevant to the question."""
     print("--- GRADING RETRIEVED DOCUMENTS ---")
     question = state["messages"][0].content
-    context = state["messages"][-1].content
+    
+    last_msg = state["messages"][-1]
+    # Bypass grading if list_ingested_documents tool was used
+    if getattr(last_msg, "name", None) == "list_ingested_documents":
+        print("Grade Relevance Score: yes (bypassed for catalog query)")
+        return "generate_answer"
+        
+    context = last_msg.content
 
     prompt = GRADE_PROMPT.format(question=question, context=context)
-    response = (
-        grader_model
-        .with_structured_output(GradeDocuments).invoke(
-            [{"role": "user", "content": prompt}]
+    score = "no"
+    try:
+        response = (
+            grader_model
+            .with_structured_output(GradeDocuments).invoke(
+                [{"role": "user", "content": prompt}]
+            )
         )
-    )
-    score = response.binary_score
+        score = response.binary_score.lower().strip()
+    except Exception as e:
+        print(f"Warning: with_structured_output failed ({e}). Falling back to simple text grading...")
+        fallback_prompt = (
+            f"{prompt}\n\n"
+            "Respond with only one word: 'yes' if the document is relevant, or 'no' if it is not."
+        )
+        try:
+            fallback_response = grader_model.invoke([{"role": "user", "content": fallback_prompt}])
+            resp_content = fallback_response.content.lower().strip()
+            if "yes" in resp_content:
+                score = "yes"
+            else:
+                score = "no"
+        except Exception as fallback_err:
+            print(f"Error during fallback grading: {fallback_err}. Defaulting score to 'no'.")
+            score = "no"
+
     print(f"Grade Relevance Score: {score}")
 
     if score == "yes":

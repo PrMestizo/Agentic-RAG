@@ -8,17 +8,58 @@ from langchain_core.documents import Document
 from langchain_text_splitters import RecursiveCharacterTextSplitter
 from langchain_experimental.text_splitter import SemanticChunker
 from langchain_chroma import Chroma
+from langchain_community.retrievers import BM25Retriever
+from langchain_core.retrievers import BaseRetriever
+from langchain_core.callbacks import CallbackManagerForRetrieverRun
+from typing import List, Dict
 from config import get_embeddings, CHROMA_DB_DIR
+import pickle
+
+class CustomEnsembleRetriever(BaseRetriever):
+    retrievers: List[BaseRetriever]
+    weights: List[float]
+    
+    def _get_relevant_documents(self, query: str, *, run_manager: CallbackManagerForRetrieverRun) -> List[Document]:
+        all_docs_results = [r.invoke(query) for r in self.retrievers]
+        
+        c = 60
+        rrf_scores: Dict[str, float] = {}
+        doc_map: Dict[str, Document] = {}
+        
+        for i, docs in enumerate(all_docs_results):
+            weight = self.weights[i]
+            for rank, doc in enumerate(docs):
+                key = doc.page_content
+                if key not in rrf_scores:
+                    rrf_scores[key] = 0.0
+                    doc_map[key] = doc
+                rrf_scores[key] += weight * (1 / (rank + c))
+                
+        sorted_keys = sorted(rrf_scores.keys(), key=lambda k: rrf_scores[k], reverse=True)
+        return [doc_map[k] for k in sorted_keys][:5]
+
+BM25_DOCS_PATH = os.path.abspath("bm25_docs.pkl")
+
+def _load_bm25_docs():
+    if os.path.exists(BM25_DOCS_PATH):
+        try:
+            with open(BM25_DOCS_PATH, "rb") as f:
+                return pickle.load(f)
+        except Exception as e:
+            print(f"Error loading BM25 docs: {e}")
+    return []
+
+def _save_bm25_docs(docs):
+    try:
+        with open(BM25_DOCS_PATH, "wb") as f:
+            pickle.dump(docs, f)
+    except Exception as e:
+        print(f"Error saving BM25 docs: {e}")
 
 _vectorstore = None
 _retriever = None
 
-def load_web_page(url: str, bs_kwargs: dict | None = None) -> list[Document]:
-    """Helper to download and parse a web page using BeautifulSoup."""
-    response = requests.get(url)
-    response.raise_for_status()
-    soup = bs4.BeautifulSoup(response.text, "html.parser", **(bs_kwargs or {}))
-    return [Document(page_content=soup.get_text(), metadata={"source": url})]
+
 
 def extract_pdf_with_mineru(file_path: str) -> list[Document]:
     """Tries to extract PDF text using MinerU's CLI via Docker."""
@@ -122,32 +163,37 @@ def get_vectorstore():
         )
     return _vectorstore
 
-def _build_default_database():
-    """Fills the database with default Lilian Weng urls if empty."""
-    urls = [
-        "https://lilianweng.github.io/posts/2024-11-28-reward-hacking/",
-        "https://lilianweng.github.io/posts/2024-07-07-hallucination/",
-        "https://lilianweng.github.io/posts/2024-04-12-diffusion-video/",
-    ]
-    docs = [load_web_page(url) for url in urls]
-    docs_list = [item for sublist in docs for item in sublist]
 
-    text_splitter = RecursiveCharacterTextSplitter.from_tiktoken_encoder(
-        chunk_size=100, chunk_overlap=50
-    )
-    doc_splits = text_splitter.split_documents(docs_list)
-    
-    vectorstore = get_vectorstore()
-    vectorstore.add_documents(doc_splits)
-    print(f"Indexed default Lilian Weng blog posts. Split into {len(doc_splits)} chunks.")
 
 def get_retriever():
-    """Exposes the retriever."""
+    """Exposes the hybrid retriever."""
+    global _retriever
+    if _retriever is not None:
+        return _retriever
+
     vectorstore = get_vectorstore()
-    return vectorstore.as_retriever(search_kwargs={"k": 8})
+    chroma_retriever = vectorstore.as_retriever(search_kwargs={"k": 5})
+    
+    bm25_docs = _load_bm25_docs()
+    if not bm25_docs:
+        print("WARNING: BM25 index is empty. Falling back to semantic search only.")
+        _retriever = chroma_retriever
+        return _retriever
+        
+    bm25_retriever = BM25Retriever.from_documents(bm25_docs)
+    bm25_retriever.k = 5
+    
+    ensemble_retriever = CustomEnsembleRetriever(
+        retrievers=[chroma_retriever, bm25_retriever],
+        weights=[0.5, 0.5]
+    )
+    _retriever = ensemble_retriever
+    return _retriever
 
 def index_document(file_path: str):
     """Indexes a local file into Chroma DB."""
+    global _retriever
+    _retriever = None
     abs_path = os.path.abspath(file_path)
     print(f"Indexing document: {abs_path}")
     
@@ -161,8 +207,8 @@ def index_document(file_path: str):
         return
         
     # Split
-    print("Applying Semantic Chunking...")
-    text_splitter = SemanticChunker(get_embeddings(), breakpoint_threshold_type="percentile")
+    print("Applying Recursive Character Text Splitting...")
+    text_splitter = RecursiveCharacterTextSplitter(chunk_size=1000, chunk_overlap=200)
     doc_splits = text_splitter.split_documents(docs)
     
     # Contextual Retrieval Injection
@@ -211,20 +257,37 @@ def index_document(file_path: str):
     for i in range(0, len(doc_splits), batch_size):
         batch = doc_splits[i:i+batch_size]
         vectorstore.add_documents(batch)
-    print(f"Successfully indexed {abs_path}. Split into {len(doc_splits)} chunks.")
+    print(f"Successfully indexed {abs_path} into Chroma DB.")
+    
+    # Store in BM25 list
+    bm25_docs = _load_bm25_docs()
+    bm25_docs.extend(doc_splits)
+    _save_bm25_docs(bm25_docs)
+    print(f"Successfully added {abs_path} to BM25 index. Split into {len(doc_splits)} chunks.")
 
 def delete_document(file_path: str):
     """Deletes all chunks of a document from Chroma DB based on its source metadata."""
+    global _retriever
+    _retriever = None
     abs_path = os.path.abspath(file_path)
     vectorstore = get_vectorstore()
     try:
         db_data = vectorstore.get(where={"source": abs_path})
         ids = db_data.get("ids", [])
         if ids:
-            print(f"Deleting {len(ids)} existing chunks for: {abs_path}")
+            print(f"Deleting {len(ids)} existing chunks from Chroma for: {abs_path}")
             vectorstore.delete(ids=ids)
-            print(f"Deleted successfully.")
+            print(f"Deleted from Chroma successfully.")
         else:
-            print(f"No existing chunks found for: {abs_path}")
+            print(f"No existing chunks found in Chroma for: {abs_path}")
+            
+        # Delete from BM25 list
+        bm25_docs = _load_bm25_docs()
+        original_len = len(bm25_docs)
+        bm25_docs = [doc for doc in bm25_docs if doc.metadata.get("source") != abs_path]
+        if len(bm25_docs) < original_len:
+            _save_bm25_docs(bm25_docs)
+            print(f"Deleted {original_len - len(bm25_docs)} chunks from BM25 index.")
+            
     except Exception as e:
         print(f"Error checking/deleting existing chunks for {abs_path}: {e}")
